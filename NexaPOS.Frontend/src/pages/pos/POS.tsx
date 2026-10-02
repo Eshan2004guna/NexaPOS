@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { Product } from "../../types/product";
-
+import type { Customer } from "../../types/customer";
 import { productService } from "../../services/productService";
+import { customerService } from "../../services/customerService";
 
 import {
 
@@ -52,70 +53,12 @@ type BillItem = {
 
 
 
-type Customer = {
-
-  id: number;
-
-  name: string;
-
-  phone: string;
-
-  email: string;
-
-  points: number;
-
-};
 
 
 
 
 
 
-const initialCustomers: Customer[] = [
-
-  {
-
-    id: 1,
-
-    name: "Kasun Perera",
-
-    phone: "0771234567",
-
-    email: "kasun@example.com",
-
-    points: 245,
-
-  },
-
-  {
-
-    id: 2,
-
-    name: "Nimal Silva",
-
-    phone: "0712345678",
-
-    email: "nimal@example.com",
-
-    points: 120,
-
-  },
-
-  {
-
-    id: 3,
-
-    name: "Amal Fernando",
-
-    phone: "0769876543",
-
-    email: "amal@example.com",
-
-    points: 380,
-
-  },
-
-];
 
 
 
@@ -168,11 +111,10 @@ export default function POS() {
   ]);
 
 
-
-  const [customers, setCustomers] =
-
-    useState<Customer[]>(initialCustomers);
-
+const [customers, setCustomers] =
+  useState<Customer[]>(
+    customerService.getCustomers(),
+  );
 
 
   const [selectedCustomer, setSelectedCustomer] =
@@ -357,7 +299,7 @@ export default function POS() {
 
     ? Math.min(
 
-        selectedCustomer.points,
+        selectedCustomer.loyaltyPoints,
 
         Math.max(subtotal - discount, 0),
 
@@ -416,17 +358,11 @@ export default function POS() {
     cashReceived !== "" && cash < total;
 
 
-
-  const newCustomerPoints = selectedCustomer
-
-    ? selectedCustomer.points +
-
-      pointsEarned -
-
-      safeRedeemPoints
-
-    : 0;
-
+const newCustomerPoints = selectedCustomer
+  ? selectedCustomer.loyaltyPoints +
+    pointsEarned -
+    safeRedeemPoints
+  : 0;
 
 
   // ==========================================
@@ -679,84 +615,69 @@ export default function POS() {
 
 
   const addCustomer = () => {
+  const name = newCustomerName.trim();
+  const phone = newCustomerPhone.trim();
+  const email = newCustomerEmail.trim();
 
-    const name = newCustomerName.trim();
+  if (!name) {
+    alert("Please enter customer name.");
+    return;
+  }
 
-    const phone =
+  if (!phone) {
+    alert("Please enter customer phone number.");
+    return;
+  }
 
-      newCustomerPhone.trim();
+  const existingCustomer =
+    customerService.getCustomerByPhone(phone);
 
-    const email =
+  if (existingCustomer) {
+    alert(
+      "A customer with this phone number already exists.",
+    );
+    return;
+  }
 
-      newCustomerEmail.trim();
+  const newCustomer: Customer = {
+    id: Date.now(),
+    name,
+    phone,
+    email,
+    address: "",
 
+    loyaltyPoints: 0,
+    balance: 0,
 
+    totalPurchases: 0,
+    totalSpent: 0,
 
-    if (!name) {
+    lastPurchaseDate: null,
 
-      alert("Please enter customer name.");
+    createdAt: new Date()
+      .toISOString()
+      .split("T")[0],
+  };
 
-      return;
+  customerService.addCustomer(
+    newCustomer,
+  );
 
-    }
+  const updatedCustomers =
+    customerService.getCustomers();
 
+  setCustomers(updatedCustomers);
 
+  setSelectedCustomer(newCustomer);
 
-    if (!phone) {
+  setNewCustomerName("");
+  setNewCustomerPhone("");
+  setNewCustomerEmail("");
 
-      alert("Please enter customer phone number.");
-
-      return;
-
-    }
-
-
-
-    const newCustomer: Customer = {
-
-      id: Date.now(),
-
-      name,
-
-      phone,
-
-      email,
-
-      points: 0,
-
-    };
-
-
-
-    setCustomers((current) => [
-
-      ...current,
-
-      newCustomer,
-
-    ]);
-
-
-
-    setSelectedCustomer(newCustomer);
-
-
-
-    setNewCustomerName("");
-
-    setNewCustomerPhone("");
-
-    setNewCustomerEmail("");
-
-
-
-    setShowAddCustomer(false);
-
-    setShowCustomerModal(false);
-
-    setCustomerSearch("");
-
-  };
+  setShowAddCustomer(false);
+  setShowCustomerModal(false);
+  setCustomerSearch("");
+};
 
 
 
@@ -803,35 +724,45 @@ export default function POS() {
      */
 
     if (selectedCustomer) {
+  const latestCustomer =
+    customerService.getCustomerById(
+      selectedCustomer.id,
+    );
 
-      setCustomers((current) =>
+  if (latestCustomer) {
+    const updatedCustomer: Customer = {
+      ...latestCustomer,
 
-        current.map((customer) =>
+      loyaltyPoints:
+        latestCustomer.loyaltyPoints +
+        pointsEarned -
+        safeRedeemPoints,
 
-          customer.id === selectedCustomer.id
+      totalPurchases:
+        latestCustomer.totalPurchases + 1,
 
-            ? {
+      totalSpent:
+        latestCustomer.totalSpent + total,
 
-                ...customer,
+      lastPurchaseDate:
+        new Date()
+          .toISOString()
+          .split("T")[0],
+    };
 
-                points:
+    customerService.updateCustomer(
+      updatedCustomer,
+    );
 
-                  customer.points +
+    setCustomers(
+      customerService.getCustomers(),
+    );
 
-                  pointsEarned -
-
-                  safeRedeemPoints,
-
-              }
-
-            : customer,
-
-        ),
-
-      );
-
-    }
-
+    setSelectedCustomer(
+      updatedCustomer,
+    );
+  }
+}
     // Update shared inventory after a successful payment.
     const updatedProducts = productService.getProducts().map((product) => {
       const soldItem = items.find((item) => item.id === product.id);
@@ -1674,7 +1605,7 @@ export default function POS() {
 
                   <span className="font-bold text-blue-600">
 
-                    {selectedCustomer.points}
+                    {selectedCustomer.loyaltyPoints}
 
                   </span>
 
@@ -1732,7 +1663,7 @@ export default function POS() {
 
                   <span className="font-semibold">
 
-                    {selectedCustomer.points}
+                    {selectedCustomer.loyaltyPoints}
 
                   </span>
 
@@ -2452,7 +2383,7 @@ export default function POS() {
 
 
 
-                        {customer.points}
+                        {customer.loyaltyPoints}
 
                       </div>
 
