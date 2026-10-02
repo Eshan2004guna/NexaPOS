@@ -7,6 +7,7 @@ import Products from "./pages/products/Products";
 import Inventory from "./pages/inventory/Inventory";
 import Purchases from "./pages/purchases/Purchases";
 import Customers from "./pages/customers/Customers";
+import Sales from "./pages/sales/Sales";
 
 function App() {
   return (
@@ -18,8 +19,8 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/inventory" element={<Inventory />}/>
           <Route path="/purchases" element={<Purchases />} />
-          <Route path="/customers" element={<Customers />}
-/>
+          <Route path="/customers" element={<Customers />}/>
+          <Route path="/sales" element={<Sales />} />
 
         </Route>
       </Routes>
